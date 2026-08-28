@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp, useInput, useStdin, useStdout } from 'ink';
 import { EditorFailedError, NotFoundError, STATUSES, openEditor, watchChanges, type Task, type TaskStore } from '@todo/core';
 import { columns, locate, moveSelection, resolveSelection } from './board-model.ts';
@@ -23,7 +23,7 @@ export function App({ store, project, all, intervalMs, width }: AppProps) {
   const { setRawMode, isRawModeSupported } = useStdin();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [lastPos, setLastPos] = useState({ column: 0, row: 0 });
+  const lastPos = useRef({ column: 0, row: 0 });
   const [mode, setMode] = useState<Mode>('board');
   const [message, setMessage] = useState<string | null>(null);
   const [live, setLive] = useState(true);
@@ -38,8 +38,8 @@ export function App({ store, project, all, intervalMs, width }: AppProps) {
   const reload = useCallback(() => {
     const fresh = store.list({ project, all });
     setTasks(fresh);
-    setSelectedId((current) => resolveSelection(columns(fresh), current, lastPos.column, lastPos.row));
-  }, [store, project, all, lastPos]);
+    setSelectedId((current) => resolveSelection(columns(fresh), current, lastPos.current.column, lastPos.current.row));
+  }, [store, project, all]);
 
   useEffect(() => {
     reload();
@@ -53,7 +53,8 @@ export function App({ store, project, all, intervalMs, width }: AppProps) {
   useEffect(() => {
     if (selectedId === null) return;
     const at = locate(cols, selectedId);
-    if (at) setLastPos(at);
+    if (at) lastPos.current = at;
+    else if (mode === 'detail') setMode('board');
   }, [selectedId, tasks]);
 
   const selectedTask = (): Task | undefined => tasks.find((t) => t.id === selectedId);
@@ -201,7 +202,6 @@ export function App({ store, project, all, intervalMs, width }: AppProps) {
   if (mode === 'detail' && task) {
     return <Detail task={task} scroll={scroll} height={height} live={live} message={message} />;
   }
-  if (mode === 'detail') setMode('board');
   return (
     <Board
       cols={cols}

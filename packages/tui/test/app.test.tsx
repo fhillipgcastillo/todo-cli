@@ -35,6 +35,17 @@ test('renders the six columns with counts', async () => {
   r.unmount();
 });
 
+test('loading tasks does not re-render in a loop', async () => {
+  for (let i = 0; i < 6; i++) store.add({ project: 'p', title: `t${i}` });
+  let calls = 0;
+  const list = store.list.bind(store);
+  store.list = (filter) => { calls++; return list(filter); };
+  const r = render(<App store={store} project="p" all={true} intervalMs={100000} width={100} />);
+  await tick(300);
+  r.unmount();
+  assert.ok(calls <= 2, `store.list() called ${calls} times`);
+});
+
 test('hides other projects unless all', async () => {
   store.add({ project: 'other', title: 'elsewhere' });
   const r = mount();
