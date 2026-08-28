@@ -82,6 +82,31 @@ test('remove deletes; missing ids throw NotFoundError', () => {
   assert.throws(() => store.setStatus(99, 'done'), NotFoundError);
 });
 
+test('dataVersion is stable across own reads', () => {
+  const a = store.dataVersion();
+  store.list({ all: true });
+  assert.equal(store.dataVersion(), a);
+});
+
+test('dataVersion changes after another connection writes', () => {
+  const before = store.dataVersion();
+  const other = TaskStore.open(path);
+  other.add({ project: 'a', title: 'remote' });
+  other.close();
+  assert.notEqual(store.dataVersion(), before);
+});
+
+test('busy_timeout is set', () => {
+  const other = TaskStore.open(path);
+  try {
+    other.add({ project: 'a', title: 'x' });
+    store.add({ project: 'a', title: 'y' });
+    assert.equal(store.list({ all: true }).length, 2);
+  } finally {
+    other.close();
+  }
+});
+
 test('reopening keeps data', () => {
   store.add({ project: 'a', title: 'persist' });
   store.close();

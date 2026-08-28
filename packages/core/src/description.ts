@@ -18,15 +18,28 @@ export function readDescription(src: DescriptionSource): string | undefined {
   return text === '' ? undefined : text;
 }
 
-function openEditor(): string {
+export class EditorFailedError extends Error {
+  code: number | null;
+  constructor(code: number | null) {
+    super(code === null ? 'editor could not be started' : `editor exited with ${code}`);
+    this.name = 'EditorFailedError';
+    this.code = code;
+  }
+}
+
+/** Opens $VISUAL / $EDITOR / vi on a temp file seeded with `initial`; returns its final contents */
+export function openEditor(initial: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'todo-edit-'));
   const file = join(dir, 'DESCRIPTION.md');
-  writeFileSync(file, '');
+  writeFileSync(file, initial);
   const editor = process.env.VISUAL || process.env.EDITOR || 'vi';
-  spawnSync(editor, [file], { stdio: 'inherit', shell: true });
-  const text = readFileSync(file, 'utf8');
-  rmSync(dir, { recursive: true, force: true });
-  return text;
+  try {
+    const result = spawnSync(editor, [file], { stdio: 'inherit', shell: true });
+    if (result.status !== 0) throw new EditorFailedError(result.status);
+    return readFileSync(file, 'utf8');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 export function stdinSource(flag?: string): DescriptionSource {
@@ -34,6 +47,6 @@ export function stdinSource(flag?: string): DescriptionSource {
     flag,
     stdinIsTTY: process.stdin.isTTY === true,
     readStdin: () => readFileSync(0, 'utf8'),
-    openEditor,
+    openEditor: () => openEditor(''),
   };
 }

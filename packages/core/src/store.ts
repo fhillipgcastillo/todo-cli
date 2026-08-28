@@ -59,6 +59,7 @@ export class TaskStore {
     mkdirSync(dirname(path), { recursive: true });
     const db = new DatabaseSync(path);
     db.exec('PRAGMA journal_mode = WAL');
+    db.exec('PRAGMA busy_timeout = 2000');
     db.exec(SCHEMA);
     const row = db.prepare('SELECT version FROM schema_version').get() as { version: number } | undefined;
     if (!row) db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(SCHEMA_VERSION);
@@ -116,6 +117,11 @@ export class TaskStore {
   remove(id: number): void {
     const result = this.#db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
     if (result.changes === 0) throw new NotFoundError(id);
+  }
+
+  dataVersion(): number {
+    const row = this.#db.prepare('PRAGMA data_version').get() as { data_version: number };
+    return row.data_version;
   }
 
   close(): void {
