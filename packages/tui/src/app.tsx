@@ -13,11 +13,9 @@ export interface AppProps {
   project: string;
   all: boolean;
   intervalMs: number;
-  /** Overrides stdout.columns */
-  width?: number;
 }
 
-export function App({ store, project, all, intervalMs, width }: AppProps) {
+export function App({ store, project, all, intervalMs }: AppProps) {
   const { exit } = useApp();
   const { stdout } = useStdout();
   const { setRawMode, isRawModeSupported } = useStdin();
@@ -29,6 +27,7 @@ export function App({ store, project, all, intervalMs, width }: AppProps) {
   const [live, setLive] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
   const [scroll, setScroll] = useState(0);
+  const [size, setSize] = useState({ columns: stdout.columns ?? 80, rows: stdout.rows ?? 24 });
   const [formTarget, setFormTarget] = useState<Task | 'new' | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [returnMode, setReturnMode] = useState<Mode>('board');
@@ -44,6 +43,12 @@ export function App({ store, project, all, intervalMs, width }: AppProps) {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  useEffect(() => {
+    const onResize = () => setSize({ columns: stdout.columns ?? 80, rows: stdout.rows ?? 24 });
+    stdout.on('resize', onResize);
+    return () => { stdout.off('resize', onResize); };
+  }, [stdout]);
 
   useEffect(() => {
     if (!live) return;
@@ -183,7 +188,7 @@ export function App({ store, project, all, intervalMs, width }: AppProps) {
     setMode(returnMode);
   };
 
-  const height = Math.max(3, (stdout.rows ?? 24) - 10);
+  const height = Math.max(3, size.rows - 10);
   const task = selectedTask();
   if (mode === 'confirm' && deleteTarget) {
     return <Confirm question={`delete #${deleteTarget.id} "${deleteTarget.title}"? y/n`} onYes={confirmDelete} onNo={cancelDelete} />;
@@ -210,7 +215,7 @@ export function App({ store, project, all, intervalMs, width }: AppProps) {
       all={all}
       live={live}
       message={message}
-      width={width ?? stdout.columns ?? 80}
+      width={size.columns}
       showHelp={showHelp}
     />
   );

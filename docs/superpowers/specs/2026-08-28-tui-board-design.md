@@ -134,7 +134,7 @@ On `EditorFailedError` the status line shows `editor exited with <code>; descrip
 | selected task removed / changed remotely between poll and keypress (`NotFoundError`) | status line `task #<id> no longer exists`, reload; never crashes |
 | `InvalidStatusError` (cannot happen from the key table; defensive) | status line message |
 | write collides with another writer | `busy_timeout` waits up to 2 s; if it still fails the error text goes to the status line |
-| terminal resize | Ink re-renders; column widths recomputed from `stdout.columns` |
+| terminal resize | `App` listens to `stdout` `resize` and keeps the size in state (Ink only re-lays out, it does not re-render components); column widths and detail height recompute from it |
 | `ctrl-c` / `q` | stop watcher, `store.close()`, exit 0 |
 
 The status line clears on the next keypress.

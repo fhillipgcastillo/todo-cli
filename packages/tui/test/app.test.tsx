@@ -18,7 +18,7 @@ beforeEach(() => {
 afterEach(() => store.close());
 
 function mount(all = false) {
-  return render(<App store={store} project="p" all={all} intervalMs={20} width={100} />);
+  return render(<App store={store} project="p" all={all} intervalMs={20} />);
 }
 
 test('renders the six columns with counts', async () => {
@@ -40,10 +40,23 @@ test('loading tasks does not re-render in a loop', async () => {
   let calls = 0;
   const list = store.list.bind(store);
   store.list = (filter) => { calls++; return list(filter); };
-  const r = render(<App store={store} project="p" all={true} intervalMs={100000} width={100} />);
+  const r = render(<App store={store} project="p" all={true} intervalMs={100000} />);
   await tick(300);
   r.unmount();
   assert.ok(calls <= 2, `store.list() called ${calls} times`);
+});
+
+test('terminal resize re-lays out the columns without input', async () => {
+  store.add({ project: 'p', title: 'first' });
+  const r = mount();
+  await tick();
+  const widthOf = (frame: string) => Math.max(...frame.split('\n').map((l) => l.length));
+  assert.ok(widthOf(r.lastFrame()!) > 60);
+  Object.defineProperty(r.stdout, 'columns', { value: 60, configurable: true });
+  r.stdout.emit('resize');
+  await tick();
+  assert.ok(widthOf(r.lastFrame()!) <= 60, `frame is ${widthOf(r.lastFrame()!)} wide`);
+  r.unmount();
 });
 
 test('hides other projects unless all', async () => {
