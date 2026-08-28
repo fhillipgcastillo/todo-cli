@@ -22,7 +22,7 @@ described in `superpowers/specs/2026-08-27-todo-mvp-design.md`.
 2. **MCP server** (`todo-mcp`) — MVP. Same verbs as tools so Claude Code can
    record and update project tasks while working in the project.
 3. **Skill** (`/todo`) — MVP. Manual entry point that tells Claude when/how to use the tools.
-4. **TUI board** *(post-MVP)* — columns in order:
+4. **TUI board** (`todo-tui`, shipped 2026-08-28 ahead of relations) — columns in order:
    `backlog` (all pending) · `todo` (picked for active work) · `in_progress` ·
    `review` · `on_hold` · `done`. Move tasks between columns, open a task to read
    its full description, see relations.
@@ -38,5 +38,5 @@ board metadata can be added by migration.
 |---|---|
 | **MVP** | monorepo, `core` CLI + SQLite, `mcp` server, `skill` |
 | v2 | task relations |
-| v3 | TUI board |
+| v3 | TUI board — shipped (2026-08-28), before v2 |
 | later | tags, search, export |

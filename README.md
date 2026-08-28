@@ -6,8 +6,11 @@ Code, and a `/todo` skill. Full product vision in `docs/VISION.md`; this MVP in
 
 ## System design
 
-Three pieces, one database. `core` knows nothing about AI; `mcp` is a thin
+Four pieces, one database. `core` knows nothing about AI; `mcp` is a thin
 adapter over `core`; the skill is prose that teaches Claude when to call `mcp`.
+`tui` is a board over the same file; it polls `PRAGMA data_version` every
+250 ms and re-reads when any other connection (MCP, CLI) commits, so changes
+made by Claude appear live.
 
 ```mermaid
 flowchart LR
@@ -19,12 +22,15 @@ flowchart LR
     subgraph repo["todo-cli (this repo)"]
         SK["packages/skill<br/>SKILL.md (/todo)"]
         MCP["packages/mcp<br/>todo-mcp · stdio MCP server<br/>add_task · list_tasks · show_task<br/>update_task · set_status · delete_task"]
+        TUI["packages/tui<br/>todo-tui · Ink board<br/>live via PRAGMA data_version"]
         CORE["packages/core<br/>TaskStore · detectProject · todo CLI"]
     end
 
     DB[("~/.todo/todo.db<br/>SQLite")]
 
     T -- "todo add / list / …" --> CORE
+    T -- "todo-tui" --> TUI
+    TUI -- "imports TaskStore, polls dataVersion()" --> CORE
     CC -. "reads" .-> SK
     CC -- "MCP tool calls (JSON-RPC over stdio)" --> MCP
     MCP -- "imports TaskStore" --> CORE
@@ -61,8 +67,7 @@ stateDiagram-v2
 ```
 
 Any status → any status is allowed (`set_status` only validates the name);
-the diagram is the intended flow, which the future TUI board will show as
-columns.
+the diagram is the intended flow, which `todo-tui` shows as columns.
 
 | field | type | notes |
 |---|---|---|
@@ -97,7 +102,8 @@ todo-cli/
     │   │   ├── db-path.ts     resolveDbPath(): $TODO_DB or ~/.todo/todo.db
     │   │   ├── store.ts       TaskStore — schema, CRUD over node:sqlite
     │   │   ├── project.ts     detectProject(cwd)
-    │   │   ├── description.ts -d flag → piped stdin → $EDITOR
+    │   │   ├── description.ts -d flag → piped stdin → $EDITOR; openEditor(initial)
+    │   │   ├── watch.ts       watchChanges(store, onChange, ms) — PRAGMA data_version poll
     │   │   ├── format.ts      table / detail rendering for the CLI
     │   │   ├── cli.ts         `todo` binary (commander)
     │   │   └── index.ts       public API consumed by @todo/mcp
@@ -107,6 +113,15 @@ todo-cli/
     │   │   ├── tools.ts       registerTools(server, store, defaultProject)
     │   │   └── index.ts       `todo-mcp` binary — stdio transport
     │   └── test/tools.test.ts in-memory client ↔ server round-trips
+    ├── tui/                   @todo/tui — `todo-tui` Ink board
+    │   ├── src/
+    │   │   ├── index.tsx      bin — flags, guards, render
+    │   │   ├── app.tsx        mode state machine, store actions, watcher, $EDITOR
+    │   │   ├── board.tsx · detail.tsx · form.tsx · confirm.tsx
+    │   │   ├── board-model.ts columns / selection (pure)
+    │   │   ├── keys.ts        key → action per mode (pure)
+    │   │   └── date.ts        YYYY-MM-DD validation
+    │   └── test/              compiled to dist/ first — Node cannot run JSX
     └── skill/
         └── SKILL.md           the /todo skill (symlinked into ~/.claude/skills)
 ```
@@ -122,10 +137,14 @@ clone — no publish step. `<REPO>` below is the absolute path of the clone.
     cd todo-cli
     pnpm install && pnpm build
 
-### 2. `todo` command on your PATH (optional, for manual use)
+### 2. `todo` and `todo-tui` commands on your PATH (optional, for manual use)
 
-    npm link ./packages/core
+    npm link ./packages/core ./packages/tui
     todo --version        # 0.1.0
+    todo-tui --version    # 0.1.0
+
+`todo-tui` opens the live board for the current repo; `todo-tui --all` for
+every project. Keys: `?` inside the board.
 
 ### 3. MCP server (what Claude uses to read/write tasks)
 
