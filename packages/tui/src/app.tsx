@@ -85,19 +85,26 @@ export function App({ store, project, all, intervalMs }: AppProps) {
     store.setStatus(task.id, STATUSES[index]!);
   };
 
-  const editDescription = (task: Task) => {
+  const suspendForEditor = (initial: string): string => {
     setLive(false);
     if (isRawModeSupported) setRawMode(false);
     try {
-      const text = openEditor(task.description).trim();
-      if (text !== task.description) store.update(task.id, { description: text });
+      return openEditor(initial).trim();
     } catch (error) {
-      if (error instanceof EditorFailedError) setMessage(`${error.message}; description unchanged`);
-      else throw error;
+      if (error instanceof EditorFailedError) {
+        setMessage(`${error.message}; description unchanged`);
+        return initial;
+      }
+      throw error;
     } finally {
       if (isRawModeSupported) setRawMode(true);
       setLive(true);
     }
+  };
+
+  const editDescription = (task: Task) => {
+    const text = suspendForEditor(task.description);
+    if (text !== task.description) store.update(task.id, { description: text });
   };
 
   const dispatch = (action: Action) => {
@@ -169,11 +176,11 @@ export function App({ store, project, all, intervalMs }: AppProps) {
     try {
       if (!formTarget) return;
       if (formTarget.kind === 'edit') {
-        store.update(formTarget.task.id, { title: values.title, due });
+        store.update(formTarget.task.id, { title: values.title, due, description: values.description });
       } else {
         const created = formTarget.kind === 'subtask'
-          ? store.add({ project: formTarget.parent.project, title: values.title, due, parentId: formTarget.parent.id })
-          : store.add({ project, title: values.title, due });
+          ? store.add({ project: formTarget.parent.project, title: values.title, due, description: values.description, parentId: formTarget.parent.id })
+          : store.add({ project, title: values.title, due, description: values.description });
         setSelectedId(created.id);
       }
     } catch (error) {
@@ -216,9 +223,11 @@ export function App({ store, project, all, intervalMs }: AppProps) {
     return (
       <Form
         heading={heading}
-        initial={{ title: editing?.title ?? '', due: editing?.due ?? '' }}
+        initial={{ title: editing?.title ?? '', due: editing?.due ?? '', description: editing?.description ?? '' }}
         onSubmit={submitForm}
         onCancel={closeForm}
+        onEditDescription={suspendForEditor}
+        message={message}
       />
     );
   }

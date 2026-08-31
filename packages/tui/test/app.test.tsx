@@ -376,6 +376,64 @@ function withEditor(script: string, fn: () => Promise<void>): Promise<void> {
   });
 }
 
+test('add form captures the description via $EDITOR and creates the task atomically', async () => {
+  await withEditor('printf "from editor" >> "$1"', async () => {
+    const r = mount();
+    await tick();
+    await press(r, ['a', 'titled', '\t', '\t']);
+    assert.match(r.lastFrame()!, /description: \(none\)/);
+    r.stdin.write('\r');
+    await tick();
+    assert.equal(store.list({ project: 'p' }).length, 0);
+    assert.match(r.lastFrame()!, /description: 1 line/);
+    await press(r, ['\t', '\r']);
+    const [task] = store.list({ project: 'p' });
+    assert.equal(task!.title, 'titled');
+    assert.equal(task!.description, 'from editor');
+    r.unmount();
+  });
+});
+
+test('edit form seeds the current description into $EDITOR and saves on submit', async () => {
+  const t = store.add({ project: 'p', title: 'described', description: 'first' });
+  await withEditor('printf "\\nsecond" >> "$1"', async () => {
+    const r = mount();
+    await tick();
+    await press(r, ['e', '\t', '\t', '\r']);
+    assert.equal(store.get(t.id)!.description, 'first');
+    await press(r, ['\t', '\r']);
+    assert.equal(store.get(t.id)!.description, 'first\nsecond');
+    r.unmount();
+  });
+});
+
+test('esc cancels the form and discards the edited description', async () => {
+  const t = store.add({ project: 'p', title: 'described', description: 'first' });
+  await withEditor('printf "\\nsecond" >> "$1"', async () => {
+    const r = mount();
+    await tick();
+    await press(r, ['e', '\t', '\t', '\r']);
+    assert.match(r.lastFrame()!, /description: 2 lines/);
+    r.stdin.write(ESC);
+    await tick();
+    assert.equal(store.get(t.id)!.description, 'first');
+    assert.match(r.lastFrame()!, /backlog \(1\)/);
+    r.unmount();
+  });
+});
+
+test('a failing $EDITOR inside the form keeps the previous description and reports it', async () => {
+  store.add({ project: 'p', title: 'described', description: 'first' });
+  await withEditor('exit 2', async () => {
+    const r = mount();
+    await tick();
+    await press(r, ['e', '\t', '\t', '\r']);
+    assert.match(r.lastFrame()!, /editor exited with 2/);
+    assert.match(r.lastFrame()!, /description: 1 line/);
+    r.unmount();
+  });
+});
+
 test('d opens $EDITOR on the description and saves the result', async () => {
   const t = store.add({ project: 'p', title: 'described', description: 'first' });
   await withEditor('printf "\\nsecond" >> "$1"', async () => {
