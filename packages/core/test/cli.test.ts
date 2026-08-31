@@ -69,6 +69,31 @@ test('--json prints records', () => {
   assert.equal(JSON.parse(run(['show', '1', '--json']).out).id, 1);
 });
 
+test('add --parent creates a subtask shown indented, with parent in show', () => {
+  run(['add', 'parent']);
+  const add = run(['add', 'sub', '--parent', '1']);
+  assert.equal(add.code, 0, add.err);
+  assert.match(run(['list']).out, /↳ sub/);
+  assert.match(run(['show', '2']).out, /parent: {2}#1 parent/);
+  assert.match(run(['show', '1']).out, /\[backlog\] #2 sub/);
+});
+
+test('edit --parent attaches and none detaches', () => {
+  run(['add', 'parent']);
+  run(['add', 'loose']);
+  assert.equal(run(['edit', '2', '--parent', '1']).code, 0);
+  assert.match(run(['list']).out, /↳ loose/);
+  assert.equal(run(['edit', '2', '--parent', 'none']).code, 0);
+  assert.doesNotMatch(run(['list']).out, /↳/);
+});
+
+test('rm on a parent reports the cascade', () => {
+  run(['add', 'parent']);
+  run(['add', 'sub', '--parent', '1']);
+  assert.equal(run(['rm', '1']).out, 'removed #1 (+1 subtasks)\n');
+  assert.equal(run(['list']).out, 'no tasks\n');
+});
+
 test('errors go to stderr with exit 1', () => {
   const missing = run(['show', '42']);
   assert.equal(missing.code, 1);

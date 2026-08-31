@@ -1,8 +1,9 @@
 import { test, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
+import { DatabaseSync } from 'node:sqlite';
 import { TaskStore } from '../src/store.ts';
-import { NotFoundError, InvalidStatusError } from '../src/types.ts';
+import { NotFoundError, InvalidStatusError, InvalidParentError } from '../src/types.ts';
 import { tempDbPath } from './helpers.ts';
 
 let store: TaskStore;
@@ -104,6 +105,81 @@ test('busy_timeout is set', () => {
     assert.equal(store.list({ all: true }).length, 2);
   } finally {
     other.close();
+  }
+});
+
+test('add with parentId inherits the parent project', () => {
+  const parent = store.add({ project: 'alpha', title: 'parent' });
+  const sub = store.add({ project: 'ignored', title: 'sub', parentId: parent.id });
+  assert.equal(sub.parent_id, parent.id);
+  assert.equal(sub.project, 'alpha');
+});
+
+test('rejects a subtask as parent (one level deep)', () => {
+  const parent = store.add({ project: 'p', title: 'parent' });
+  const sub = store.add({ project: 'p', title: 'sub', parentId: parent.id });
+  assert.throws(() => store.add({ project: 'p', title: 'x', parentId: sub.id }), InvalidParentError);
+});
+
+test('rejects attaching a task that has subtasks, and self-parenting', () => {
+  const parent = store.add({ project: 'p', title: 'parent' });
+  store.add({ project: 'p', title: 'sub', parentId: parent.id });
+  const other = store.add({ project: 'p', title: 'other' });
+  assert.throws(() => store.update(parent.id, { parentId: other.id }), InvalidParentError);
+  assert.throws(() => store.update(other.id, { parentId: other.id }), InvalidParentError);
+});
+
+test('rejects a missing parent and a cross-project re-parent', () => {
+  assert.throws(() => store.add({ project: 'p', title: 'x', parentId: 999 }), NotFoundError);
+  const parent = store.add({ project: 'p', title: 'parent' });
+  const foreign = store.add({ project: 'q', title: 'foreign' });
+  assert.throws(() => store.update(foreign.id, { parentId: parent.id }), InvalidParentError);
+});
+
+test('update can attach and detach; omitting parentId keeps it', () => {
+  const parent = store.add({ project: 'p', title: 'parent' });
+  const task = store.add({ project: 'p', title: 'task' });
+  assert.equal(store.update(task.id, { parentId: parent.id }).parent_id, parent.id);
+  assert.equal(store.update(task.id, { title: 'renamed' }).parent_id, parent.id);
+  assert.equal(store.update(task.id, { parentId: null }).parent_id, null);
+});
+
+test('subtasks() lists children; list({parentId}) filters', () => {
+  const parent = store.add({ project: 'p', title: 'parent' });
+  const a = store.add({ project: 'p', title: 'a', parentId: parent.id });
+  const b = store.add({ project: 'p', title: 'b', parentId: parent.id });
+  assert.deepEqual(store.subtasks(parent.id).map((t) => t.id), [a.id, b.id]);
+  assert.deepEqual(store.list({ project: 'p', parentId: parent.id }).map((t) => t.id), [a.id, b.id]);
+});
+
+test('remove cascades to subtasks and returns the count', () => {
+  const parent = store.add({ project: 'p', title: 'parent' });
+  store.add({ project: 'p', title: 'a', parentId: parent.id });
+  store.add({ project: 'p', title: 'b', parentId: parent.id });
+  const keep = store.add({ project: 'p', title: 'keep' });
+  assert.equal(store.remove(parent.id), 3);
+  assert.deepEqual(store.list({ project: 'p' }).map((t) => t.id), [keep.id]);
+});
+
+test('migrates a v1 database in place', () => {
+  const v1path = tempDbPath();
+  const db = new DatabaseSync(v1path);
+  db.exec(`CREATE TABLE schema_version (version INTEGER NOT NULL);
+    CREATE TABLE tasks (
+      id INTEGER PRIMARY KEY, project TEXT NOT NULL, title TEXT NOT NULL,
+      description TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'backlog',
+      due TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+    INSERT INTO schema_version (version) VALUES (1);
+    INSERT INTO tasks (project, title, created_at, updated_at) VALUES ('p', 'old', 't', 't');`);
+  db.close();
+  const migrated = TaskStore.open(v1path);
+  try {
+    const [task] = migrated.list({ project: 'p' });
+    assert.equal(task!.parent_id, null);
+    const sub = migrated.add({ project: 'p', title: 'sub', parentId: task!.id });
+    assert.equal(sub.parent_id, task!.id);
+  } finally {
+    migrated.close();
   }
 });
 

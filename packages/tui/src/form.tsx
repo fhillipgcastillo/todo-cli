@@ -6,6 +6,7 @@ import { isValidDate } from './date.ts';
 export interface FormValues {
   title: string;
   due: string;
+  description: string;
 }
 
 export interface FormProps {
@@ -13,7 +14,13 @@ export interface FormProps {
   initial: FormValues;
   onSubmit: (values: FormValues) => void;
   onCancel: () => void;
+  /** Opens $EDITOR seeded with the current text and returns the edited text */
+  onEditDescription: (current: string) => string;
+  message?: string | null;
 }
+
+const FIELDS = ['title', 'due', 'description'] as const;
+type Field = (typeof FIELDS)[number];
 
 function validate(values: FormValues): string | null {
   if (values.title.trim() === '') return 'title is required';
@@ -21,19 +28,27 @@ function validate(values: FormValues): string | null {
   return null;
 }
 
-export function Form({ heading, initial, onSubmit, onCancel }: FormProps) {
+function summary(text: string): string {
+  if (text === '') return '(none)';
+  const count = text.split('\n').length;
+  return `${count} ${count === 1 ? 'line' : 'lines'}`;
+}
+
+export function Form({ heading, initial, onSubmit, onCancel, onEditDescription, message }: FormProps) {
   const [title, setTitle] = useState(initial.title);
   const [due, setDue] = useState(initial.due);
-  const [field, setField] = useState<'title' | 'due'>('title');
+  const [description, setDescription] = useState(initial.description);
+  const [field, setField] = useState<Field>('title');
   const [error, setError] = useState<string | null>(null);
 
   useInput((_input, key) => {
     if (key.escape) onCancel();
-    if (key.tab) setField((f) => (f === 'title' ? 'due' : 'title'));
+    if (key.tab) setField((f) => FIELDS[(FIELDS.indexOf(f) + 1) % FIELDS.length]!);
+    if (key.return && field === 'description') setDescription(onEditDescription(description));
   });
 
   const submit = () => {
-    const values = { title: title.trim(), due: due.trim() };
+    const values = { title: title.trim(), due: due.trim(), description };
     const problem = validate(values);
     if (problem) { setError(problem); return; }
     onSubmit(values);
@@ -50,8 +65,13 @@ export function Form({ heading, initial, onSubmit, onCancel }: FormProps) {
         <Text>{field === 'due' ? '> ' : '  '}due:   </Text>
         <TextInput value={due} onChange={setDue} onSubmit={submit} focus={field === 'due'} placeholder="YYYY-MM-DD" />
       </Box>
-      <Text dimColor>tab switch field · enter save · esc cancel</Text>
+      <Box>
+        <Text>{field === 'description' ? '> ' : '  '}description: {summary(description)}</Text>
+        {field === 'description' ? <Text dimColor>  (enter opens $EDITOR)</Text> : null}
+      </Box>
+      <Text dimColor>tab switch field · enter save / on description open $EDITOR · esc cancel</Text>
       {error ? <Text color="red">{error}</Text> : null}
+      {message ? <Text color="yellow">{message}</Text> : null}
     </Box>
   );
 }

@@ -38,6 +38,7 @@ program
   .argument('<title>')
   .option('-d, --description <text>')
   .option('--due <date>', 'YYYY-MM-DD')
+  .option('--parent <id>', 'create as a subtask of that task', parseId)
   .option('--project <name>')
   .option('--json')
   .action((title: string, opts) => {
@@ -46,6 +47,7 @@ program
       title,
       description: readDescription(stdinSource(opts.description)),
       due: opts.due ?? null,
+      parentId: opts.parent,
     });
     emit(Boolean(opts.json), task, `added #${task.id} ${task.title}\n`);
   });
@@ -68,7 +70,8 @@ program
   .action((id: number, opts) => {
     const task = store.get(id);
     if (!task) throw new Error(`task ${id} not found`);
-    emit(Boolean(opts.json), task, renderTask(task));
+    const parent = task.parent_id === null ? undefined : store.get(task.parent_id);
+    emit(Boolean(opts.json), task, renderTask(task, { parent, subtasks: store.subtasks(id) }));
   });
 
 program
@@ -77,12 +80,14 @@ program
   .option('--title <title>')
   .option('-d, --description <text>')
   .option('--due <date>', 'YYYY-MM-DD, or "none" to clear')
+  .option('--parent <id|none>', 'attach to a parent task, or "none" to detach')
   .option('--json')
   .action((id: number, opts) => {
     const task = store.update(id, {
       title: opts.title,
       description: opts.description,
       due: opts.due === undefined ? undefined : opts.due === 'none' ? null : opts.due,
+      parentId: opts.parent === undefined ? undefined : opts.parent === 'none' ? null : parseId(opts.parent),
     });
     emit(Boolean(opts.json), task, `updated #${task.id} ${task.title}\n`);
   });
@@ -110,8 +115,8 @@ program
   .command('rm')
   .argument('<id>', undefined, parseId)
   .action((id: number) => {
-    store.remove(id);
-    process.stdout.write(`removed #${id}\n`);
+    const removed = store.remove(id);
+    process.stdout.write(removed > 1 ? `removed #${id} (+${removed - 1} subtasks)\n` : `removed #${id}\n`);
   });
 
 try {

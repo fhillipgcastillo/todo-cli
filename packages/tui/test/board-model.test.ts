@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Task } from '@todo/core';
-import { columns, locate, resolveSelection, moveSelection, truncate } from '../src/board-model.ts';
+import { columns, locate, resolveSelection, moveSelection, truncate, viewColumn } from '../src/board-model.ts';
 
-function task(id: number, status: Task['status']): Task {
-  return { id, project: 'p', title: `t${id}`, description: '', status, due: null, created_at: '', updated_at: '' };
+function task(id: number, status: Task['status'], parent: number | null = null): Task {
+  return { id, project: 'p', title: `t${id}`, description: '', status, due: null, parent_id: parent, created_at: '', updated_at: '' };
 }
 
 const tasks = [task(1, 'backlog'), task(2, 'backlog'), task(3, 'in_progress'), task(4, 'done')];
@@ -47,6 +47,40 @@ test('moveSelection by column skips empty columns and clamps at edges', () => {
 
 test('moveSelection with no selection picks the first task', () => {
   assert.equal(moveSelection(cols, null, { row: 1 }), 1);
+});
+
+test('columns keeps subtasks under their parent within a column', () => {
+  const grouped = columns([task(5, 'todo'), task(6, 'todo'), task(7, 'todo', 5)]);
+  assert.deepEqual(grouped.todo.map((t) => t.id), [5, 7, 6]);
+});
+
+const ten = Array.from({ length: 10 }, (_, i) => task(i + 1, 'todo'));
+
+test('viewColumn returns everything when it fits', () => {
+  const two = [task(1, 'todo'), task(2, 'todo')];
+  assert.deepEqual(viewColumn(two, 1, 10, () => 1), { tasks: two, above: 0, below: 0 });
+});
+
+test('viewColumn slides the window to keep the selection visible', () => {
+  const v = viewColumn(ten, 8, 6, () => 1);
+  assert.deepEqual(v.tasks.map((t) => t.id), [5, 6, 7, 8]);
+  assert.equal(v.above, 4);
+  assert.equal(v.below, 2);
+});
+
+test('viewColumn starts at the top when the selection is elsewhere', () => {
+  const v = viewColumn(ten, 99, 6, () => 1);
+  assert.deepEqual(v.tasks.map((t) => t.id), [1, 2, 3, 4]);
+  assert.equal(v.above, 0);
+  assert.equal(v.below, 6);
+});
+
+test('viewColumn accounts for multi-line cards', () => {
+  const three = [task(1, 'todo'), task(2, 'todo'), task(3, 'todo')];
+  const v = viewColumn(three, null, 5, () => 2);
+  assert.deepEqual(v.tasks.map((t) => t.id), [1]);
+  assert.equal(v.above, 0);
+  assert.equal(v.below, 2);
 });
 
 test('truncate pads and cuts', () => {
