@@ -21,10 +21,17 @@ function mount(all = false) {
   return render(<App store={store} project="p" all={all} intervalMs={20} />);
 }
 
+async function resize(r: ReturnType<typeof mount>, columns: number) {
+  Object.defineProperty(r.stdout, 'columns', { value: columns, configurable: true });
+  r.stdout.emit('resize');
+  await tick();
+}
+
 test('renders the six columns with counts', async () => {
   store.add({ project: 'p', title: 'first' });
   const r = mount();
   await tick();
+  await resize(r, 130);
   const frame = r.lastFrame()!;
   for (const name of ['backlog', 'todo', 'in_progress', 'review', 'on_hold', 'done']) assert.match(frame, new RegExp(name));
   assert.equal(frame.match(/\(1\)/g)?.length, 1);
@@ -32,6 +39,20 @@ test('renders the six columns with counts', async () => {
   assert.match(frame, /#1 first/);
   assert.match(frame, /project: p/);
   assert.match(frame, /● live/);
+  r.unmount();
+});
+
+test('board columns are rounded boxes with padded title bars', async () => {
+  store.add({ project: 'p', title: 'first' });
+  const r = mount();
+  await tick();
+  const frame = r.lastFrame()!;
+  assert.match(frame, /╭/);
+  assert.match(frame, /╰/);
+  assert.doesNotMatch(frame, /┌/);
+  assert.match(frame, /│ in_progress │/);
+  await resize(r, 130);
+  assert.match(r.lastFrame()!, /│ {2,}backlog \(1\) {2,}│/);
   r.unmount();
 });
 
@@ -67,6 +88,7 @@ test('hides other projects unless all', async () => {
   r.unmount();
   const r2 = mount(true);
   await tick();
+  await resize(r2, 130);
   assert.match(r2.lastFrame()!, /elsewhere/);
   assert.match(r2.lastFrame()!, /\[other\]/);
   r2.unmount();
@@ -90,16 +112,16 @@ test('navigation moves the selection marker', async () => {
   store.setStatus(t3.id, 'done');
   const r = mount();
   await tick();
-  assert.match(r.lastFrame()!, />#1 one/);
+  assert.match(r.lastFrame()!, /❯#1 one/);
   r.stdin.write('j');
   await tick();
-  assert.match(r.lastFrame()!, />#2 two/);
+  assert.match(r.lastFrame()!, /❯#2 two/);
   r.stdin.write('l');
   await tick();
-  assert.match(r.lastFrame()!, />#3 three/);
+  assert.match(r.lastFrame()!, /❯#3 three/);
   r.stdin.write('h');
   await tick();
-  assert.match(r.lastFrame()!, />#1 one/);
+  assert.match(r.lastFrame()!, /❯#1 one/);
   r.unmount();
 });
 
@@ -110,15 +132,15 @@ test('selection survives a reload and falls back when its task is deleted remote
   await tick();
   r.stdin.write('j');
   await tick();
-  assert.match(r.lastFrame()!, />#2 two/);
+  assert.match(r.lastFrame()!, /❯#2 two/);
   const remote = TaskStore.open(path);
   remote.add({ project: 'p', title: 'three' });
   await tick(100);
-  assert.match(r.lastFrame()!, />#2 two/);
+  assert.match(r.lastFrame()!, /❯#2 two/);
   remote.remove(t2.id);
   remote.close();
   await tick(100);
-  assert.match(r.lastFrame()!, />#3 three/);
+  assert.match(r.lastFrame()!, /❯#3 three/);
   r.unmount();
 });
 
@@ -169,6 +191,8 @@ test('enter opens detail, esc returns', async () => {
   assert.match(frame, /#1 detailed/);
   assert.match(frame, /status: {2}backlog/);
   assert.match(frame, /due: {5}2026-09-01/);
+  assert.match(frame, /── description ──/);
+  assert.match(frame, /╭/);
   assert.match(frame, /line two/);
   assert.doesNotMatch(frame, /in_progress/);
   r.stdin.write(ESC);
@@ -281,6 +305,25 @@ test('x asks for confirmation; n keeps, y deletes', async () => {
   r.unmount();
 });
 
+test('form and confirm render as rounded dialogs', async () => {
+  store.add({ project: 'p', title: 'doomed' });
+  const r = mount();
+  await tick();
+  r.stdin.write('a');
+  await tick();
+  assert.match(r.lastFrame()!, /╭/);
+  assert.match(r.lastFrame()!, /add task · project: p/);
+  r.stdin.write(ESC);
+  await tick();
+  r.stdin.write('x');
+  await tick();
+  assert.match(r.lastFrame()!, /╭/);
+  assert.match(r.lastFrame()!, /delete #1 "doomed"\? y\/n/);
+  r.stdin.write('n');
+  await tick();
+  r.unmount();
+});
+
 test('board marks subtasks and shows parent progress', async () => {
   const parent = store.add({ project: 'p', title: 'parent' });
   const sub = store.add({ project: 'p', title: 'child', parentId: parent.id });
@@ -318,7 +361,7 @@ test('s on a subtask creates a sibling under the same parent', async () => {
   await tick();
   r.stdin.write('j');
   await tick();
-  assert.match(r.lastFrame()!, />↳#2 child/);
+  assert.match(r.lastFrame()!, /❯↳#2 child/);
   r.stdin.write('s');
   await tick();
   assert.match(r.lastFrame()!, /add subtask of #1/);
@@ -351,7 +394,7 @@ test('detail shows the parent line on a subtask and the subtasks list on a paren
   await tick();
   r.stdin.write('\r');
   await tick();
-  assert.match(r.lastFrame()!, /subtasks \(0\/1\):/);
+  assert.match(r.lastFrame()!, /── subtasks \(0\/1\) ──/);
   assert.match(r.lastFrame()!, /\[backlog\] #2 child/);
   r.stdin.write(ESC);
   await tick();
@@ -471,7 +514,7 @@ test('long columns scroll with the selection and show overflow counts', async ()
     await tick(20);
   }
   await tick();
-  assert.match(r.lastFrame()!, />#20 t20/);
+  assert.match(r.lastFrame()!, /❯#20 t20/);
   assert.match(r.lastFrame()!, /↑ 4 more/);
   assert.doesNotMatch(r.lastFrame()!, /↓ \d+ more/);
   r.unmount();

@@ -208,7 +208,7 @@ export function App({ store, project, all, intervalMs }: AppProps) {
     setMode(returnMode);
   };
 
-  const height = Math.max(3, size.rows - 10);
+  const height = Math.max(3, size.rows - 13);
   const task = selectedTask();
   if (mode === 'confirm' && deleteTarget) {
     const subCount = tasks.filter((t) => t.parent_id === deleteTarget.id).length;
