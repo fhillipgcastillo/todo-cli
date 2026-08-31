@@ -9,6 +9,8 @@ export interface Task {
   status: Status;
   /** ISO date (YYYY-MM-DD) or null */
   due: string | null;
+  /** Id of the parent task, or null for a top-level task */
+  parent_id: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -21,6 +23,13 @@ export class NotFoundError extends Error {
   constructor(id: number) {
     super(`task ${id} not found`);
     this.name = 'NotFoundError';
+  }
+}
+
+export class InvalidParentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidParentError';
   }
 }
 

@@ -77,7 +77,16 @@ the diagram is the intended flow, which `todo-tui` shows as columns.
 | `description` | text | any length, default `''` |
 | `status` | enum | `backlog` (default) · `todo` · `in_progress` · `review` · `on_hold` · `done` |
 | `due` | `YYYY-MM-DD` or null | optional |
+| `parent_id` | integer or null | set = subtask of that task, one level deep |
 | `created_at`, `updated_at` | ISO timestamp | `updated_at` bumps on every write |
+
+**Subtasks** — a task becomes a subtask via `todo add --parent <id>`,
+`todo edit <id> --parent <id|none>`, or the MCP `parent_id` argument. One
+level only (a subtask cannot have subtasks), a subtask inherits the parent's
+project, and deleting a parent deletes its subtasks. `todo list` indents
+subtasks under their parent (`↳`), `todo show` prints the parent line and the
+subtask list, and the TUI groups them per column, shows `done/total` progress
+on the parent card, and adds a subtask with `s`.
 
 ## Project structure
 
@@ -185,7 +194,8 @@ DB: `~/.todo/todo.db` (`TODO_DB` overrides).
 ## Use
 
     todo add "Fix login redirect" -d "repro: ..." --due 2026-09-01
-    todo list            # current repo only
+    todo add "Write the repro test" --parent 1
+    todo list            # current repo only, subtasks indented under parents
     todo list --all
     todo status 3 in_progress
     todo done 3

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import type { Task } from '@todo/core';
 import { columns, locate, resolveSelection, moveSelection, truncate } from '../src/board-model.ts';
 
-function task(id: number, status: Task['status']): Task {
-  return { id, project: 'p', title: `t${id}`, description: '', status, due: null, created_at: '', updated_at: '' };
+function task(id: number, status: Task['status'], parent: number | null = null): Task {
+  return { id, project: 'p', title: `t${id}`, description: '', status, due: null, parent_id: parent, created_at: '', updated_at: '' };
 }
 
 const tasks = [task(1, 'backlog'), task(2, 'backlog'), task(3, 'in_progress'), task(4, 'done')];
@@ -47,6 +47,11 @@ test('moveSelection by column skips empty columns and clamps at edges', () => {
 
 test('moveSelection with no selection picks the first task', () => {
   assert.equal(moveSelection(cols, null, { row: 1 }), 1);
+});
+
+test('columns keeps subtasks under their parent within a column', () => {
+  const grouped = columns([task(5, 'todo'), task(6, 'todo'), task(7, 'todo', 5)]);
+  assert.deepEqual(grouped.todo.map((t) => t.id), [5, 7, 6]);
 });
 
 test('truncate pads and cuts', () => {

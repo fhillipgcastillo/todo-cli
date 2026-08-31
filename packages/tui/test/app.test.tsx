@@ -281,6 +281,88 @@ test('x asks for confirmation; n keeps, y deletes', async () => {
   r.unmount();
 });
 
+test('board marks subtasks and shows parent progress', async () => {
+  const parent = store.add({ project: 'p', title: 'parent' });
+  const sub = store.add({ project: 'p', title: 'child', parentId: parent.id });
+  store.add({ project: 'p', title: 'child2', parentId: parent.id });
+  store.setStatus(sub.id, 'done');
+  const r = mount();
+  await tick();
+  const frame = r.lastFrame()!;
+  assert.match(frame, /↳#3 child2/);
+  assert.match(frame, /1\/2/);
+  r.unmount();
+});
+
+test('s opens the subtask form and creates a subtask of the selection', async () => {
+  const parent = store.add({ project: 'p', title: 'parent' });
+  const r = mount();
+  await tick();
+  r.stdin.write('s');
+  await tick();
+  assert.match(r.lastFrame()!, /add subtask of #1 · project: p/);
+  r.stdin.write('child');
+  await tick();
+  r.stdin.write('\r');
+  await tick();
+  const created = store.list({ project: 'p', parentId: parent.id });
+  assert.equal(created.length, 1);
+  assert.equal(created[0]!.title, 'child');
+  r.unmount();
+});
+
+test('s on a subtask creates a sibling under the same parent', async () => {
+  const parent = store.add({ project: 'p', title: 'parent' });
+  store.add({ project: 'p', title: 'child', parentId: parent.id });
+  const r = mount();
+  await tick();
+  r.stdin.write('j');
+  await tick();
+  assert.match(r.lastFrame()!, />↳#2 child/);
+  r.stdin.write('s');
+  await tick();
+  assert.match(r.lastFrame()!, /add subtask of #1/);
+  r.stdin.write('sibling');
+  await tick();
+  r.stdin.write('\r');
+  await tick();
+  assert.equal(store.subtasks(parent.id).length, 2);
+  r.unmount();
+});
+
+test('deleting a parent warns about its subtasks and cascades', async () => {
+  const parent = store.add({ project: 'p', title: 'parent' });
+  store.add({ project: 'p', title: 'child', parentId: parent.id });
+  const r = mount();
+  await tick();
+  r.stdin.write('x');
+  await tick();
+  assert.match(r.lastFrame()!, /delete #1 "parent" and 1 subtasks\? y\/n/);
+  r.stdin.write('y');
+  await tick();
+  assert.equal(store.list({ project: 'p' }).length, 0);
+  r.unmount();
+});
+
+test('detail shows the parent line on a subtask and the subtasks list on a parent', async () => {
+  const parent = store.add({ project: 'p', title: 'parent' });
+  store.add({ project: 'p', title: 'child', parentId: parent.id });
+  const r = mount();
+  await tick();
+  r.stdin.write('\r');
+  await tick();
+  assert.match(r.lastFrame()!, /subtasks \(0\/1\):/);
+  assert.match(r.lastFrame()!, /\[backlog\] #2 child/);
+  r.stdin.write(ESC);
+  await tick();
+  r.stdin.write('j');
+  await tick();
+  r.stdin.write('\r');
+  await tick();
+  assert.match(r.lastFrame()!, /parent: {2}#1 parent/);
+  r.unmount();
+});
+
 function withEditor(script: string, fn: () => Promise<void>): Promise<void> {
   const dir = mkdtempSync(join(tmpdir(), 'todo-tui-editor-'));
   const file = join(dir, 'editor.sh');

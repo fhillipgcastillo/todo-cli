@@ -15,6 +15,8 @@ export interface AppProps {
   intervalMs: number;
 }
 
+type FormTarget = { kind: 'new' } | { kind: 'subtask'; parent: Task } | { kind: 'edit'; task: Task };
+
 export function App({ store, project, all, intervalMs }: AppProps) {
   const { exit } = useApp();
   const { stdout } = useStdout();
@@ -28,7 +30,7 @@ export function App({ store, project, all, intervalMs }: AppProps) {
   const [showHelp, setShowHelp] = useState(false);
   const [scroll, setScroll] = useState(0);
   const [size, setSize] = useState({ columns: stdout.columns ?? 80, rows: stdout.rows ?? 24 });
-  const [formTarget, setFormTarget] = useState<Task | 'new' | null>(null);
+  const [formTarget, setFormTarget] = useState<FormTarget | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [returnMode, setReturnMode] = useState<Mode>('board');
 
@@ -121,11 +123,19 @@ export function App({ store, project, all, intervalMs }: AppProps) {
         setMode('board');
         return;
       case 'add':
-        setFormTarget('new');
+        setFormTarget({ kind: 'new' });
         setMode('form');
         return;
+      case 'addSubtask':
+        withTask((task) => {
+          const parent = task.parent_id === null ? task : tasks.find((t) => t.id === task.parent_id);
+          if (!parent) return;
+          setFormTarget({ kind: 'subtask', parent });
+          setMode('form');
+        });
+        return;
       case 'edit':
-        withTask((task) => { setFormTarget(task); setMode('form'); });
+        withTask((task) => { setFormTarget({ kind: 'edit', task }); setMode('form'); });
         return;
       case 'editDescription':
         withTask(editDescription);
@@ -157,14 +167,17 @@ export function App({ store, project, all, intervalMs }: AppProps) {
   const submitForm = (values: FormValues) => {
     const due = values.due === '' ? null : values.due;
     try {
-      if (formTarget === 'new') {
-        const created = store.add({ project, title: values.title, due });
+      if (!formTarget) return;
+      if (formTarget.kind === 'edit') {
+        store.update(formTarget.task.id, { title: values.title, due });
+      } else {
+        const created = formTarget.kind === 'subtask'
+          ? store.add({ project: formTarget.parent.project, title: values.title, due, parentId: formTarget.parent.id })
+          : store.add({ project, title: values.title, due });
         setSelectedId(created.id);
-      } else if (formTarget) {
-        store.update(formTarget.id, { title: values.title, due });
       }
     } catch (error) {
-      setMessage(error instanceof NotFoundError ? `task #${(formTarget as Task).id} no longer exists` : (error as Error).message);
+      setMessage(error instanceof NotFoundError ? 'task no longer exists' : (error as Error).message);
     }
     closeForm();
     reload();
@@ -191,13 +204,18 @@ export function App({ store, project, all, intervalMs }: AppProps) {
   const height = Math.max(3, size.rows - 10);
   const task = selectedTask();
   if (mode === 'confirm' && deleteTarget) {
-    return <Confirm question={`delete #${deleteTarget.id} "${deleteTarget.title}"? y/n`} onYes={confirmDelete} onNo={cancelDelete} />;
+    const subCount = tasks.filter((t) => t.parent_id === deleteTarget.id).length;
+    const suffix = subCount > 0 ? ` and ${subCount} subtasks` : '';
+    return <Confirm question={`delete #${deleteTarget.id} "${deleteTarget.title}"${suffix}? y/n`} onYes={confirmDelete} onNo={cancelDelete} />;
   }
   if (mode === 'form' && formTarget) {
-    const editing = formTarget === 'new' ? null : formTarget;
+    const editing = formTarget.kind === 'edit' ? formTarget.task : null;
+    const heading = formTarget.kind === 'edit' ? `edit #${formTarget.task.id}`
+      : formTarget.kind === 'subtask' ? `add subtask of #${formTarget.parent.id} · project: ${formTarget.parent.project}`
+      : `add task · project: ${project}`;
     return (
       <Form
-        heading={editing ? `edit #${editing.id}` : `add task · project: ${project}`}
+        heading={heading}
         initial={{ title: editing?.title ?? '', due: editing?.due ?? '' }}
         onSubmit={submitForm}
         onCancel={closeForm}
@@ -205,7 +223,17 @@ export function App({ store, project, all, intervalMs }: AppProps) {
     );
   }
   if (mode === 'detail' && task) {
-    return <Detail task={task} scroll={scroll} height={height} live={live} message={message} />;
+    return (
+      <Detail
+        task={task}
+        parent={task.parent_id === null ? undefined : tasks.find((t) => t.id === task.parent_id)}
+        subtasks={tasks.filter((t) => t.parent_id === task.id)}
+        scroll={scroll}
+        height={height}
+        live={live}
+        message={message}
+      />
+    );
   }
   return (
     <Board

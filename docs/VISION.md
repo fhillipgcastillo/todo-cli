@@ -12,8 +12,8 @@ described in `superpowers/specs/2026-08-27-todo-mvp-design.md`.
 - **dateline** — optional due date
 - **status** — one of `backlog`, `todo`, `in_progress`, `review`, `on_hold`, `done`
 - **project** — derived from the git repository (or directory) the task was created in
-- **relations** *(post-MVP)* — link a task to another: blocks / blocked-by, relates-to,
-  parent / sub-task — so the set behaves like a Jira / Kanban board
+- **parent / sub-task** — shipped 2026-08-31 (v2): one level of subtasks via
+  `parent_id`; other relation kinds (blocks / blocked-by, relates-to) stay post-v2
 - **tags, search** *(post-MVP)*
 
 ## Surfaces
@@ -37,6 +37,6 @@ board metadata can be added by migration.
 | version | scope |
 |---|---|
 | **MVP** | monorepo, `core` CLI + SQLite, `mcp` server, `skill` |
-| v2 | task relations |
+| v2 | sub-tasks — shipped (2026-08-31), instead of generic relations |
 | v3 | TUI board — shipped (2026-08-28), before v2 |
-| later | tags, search, export |
+| later | other relations (blocks, relates-to), tags, search, export |

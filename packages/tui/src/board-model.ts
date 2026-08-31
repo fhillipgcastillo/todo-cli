@@ -1,10 +1,10 @@
-import { STATUSES, type Status, type Task } from '@todo/core';
+import { STATUSES, treeOrder, type Status, type Task } from '@todo/core';
 
 export type Columns = Record<Status, Task[]>;
 
 export function columns(tasks: Task[]): Columns {
   const cols = Object.fromEntries(STATUSES.map((s) => [s, [] as Task[]])) as Columns;
-  for (const task of [...tasks].sort((a, b) => a.id - b.id)) cols[task.status].push(task);
+  for (const task of treeOrder(tasks)) cols[task.status].push(task);
   return cols;
 }
 

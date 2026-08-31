@@ -8,6 +8,7 @@ export type Action =
   | { type: 'open' }
   | { type: 'back' }
   | { type: 'add' }
+  | { type: 'addSubtask' }
   | { type: 'edit' }
   | { type: 'editDescription' }
   | { type: 'delete' }
@@ -48,6 +49,7 @@ function boardAction(input: string, key: KeyInfo): Action | undefined {
   if (key.rightArrow || input === 'l') return { type: 'column', delta: 1 };
   if (key.return) return { type: 'open' };
   if (input === 'a') return { type: 'add' };
+  if (input === 's') return { type: 'addSubtask' };
   return sharedAction(input, key);
 }
 

@@ -2,9 +2,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { resolveDbPath } from './db-path.ts';
-import { InvalidStatusError, NotFoundError, isStatus, type Status, type Task } from './types.ts';
+import { InvalidParentError, InvalidStatusError, NotFoundError, isStatus, type Status, type Task } from './types.ts';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS tasks (
   status      TEXT NOT NULL DEFAULT 'backlog'
               CHECK (status IN ('backlog','todo','in_progress','review','on_hold','done')),
   due         TEXT,
+  parent_id   INTEGER REFERENCES tasks(id),
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL
 );
@@ -28,6 +29,8 @@ export interface AddInput {
   description?: string;
   /** YYYY-MM-DD */
   due?: string | null;
+  /** Create as a subtask of this task; the parent's project wins */
+  parentId?: number;
 }
 
 export interface ListFilter {
@@ -35,6 +38,8 @@ export interface ListFilter {
   status?: Status;
   /** Ignore `project` and return every project */
   all?: boolean;
+  /** Only subtasks of this task */
+  parentId?: number;
 }
 
 export interface UpdatePatch {
@@ -42,6 +47,8 @@ export interface UpdatePatch {
   description?: string;
   /** YYYY-MM-DD, or null to clear */
   due?: string | null;
+  /** Attach to a parent task, or null to detach */
+  parentId?: number | null;
 }
 
 function now(): string {
@@ -63,14 +70,19 @@ export class TaskStore {
     db.exec(SCHEMA);
     const row = db.prepare('SELECT version FROM schema_version').get() as { version: number } | undefined;
     if (!row) db.prepare('INSERT INTO schema_version (version) VALUES (?)').run(SCHEMA_VERSION);
+    else if (row.version < 2) {
+      db.exec('ALTER TABLE tasks ADD COLUMN parent_id INTEGER REFERENCES tasks(id)');
+      db.prepare('UPDATE schema_version SET version = ?').run(SCHEMA_VERSION);
+    }
     return new TaskStore(db);
   }
 
   add(input: AddInput): Task {
+    const parent = input.parentId === undefined ? undefined : this.#validParent(input.parentId);
     const ts = now();
     const result = this.#db
-      .prepare('INSERT INTO tasks (project, title, description, due, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(input.project, input.title, input.description ?? '', input.due ?? null, ts, ts);
+      .prepare('INSERT INTO tasks (project, title, description, due, parent_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(parent?.project ?? input.project, input.title, input.description ?? '', input.due ?? null, input.parentId ?? null, ts, ts);
     return this.#require(Number(result.lastInsertRowid));
   }
 
@@ -85,6 +97,10 @@ export class TaskStore {
       where.push('status = ?');
       params.push(filter.status);
     }
+    if (filter.parentId !== undefined) {
+      where.push('parent_id = ?');
+      params.push(filter.parentId);
+    }
     const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
     return this.#db.prepare(`SELECT * FROM tasks ${clause} ORDER BY id ASC`).all(...params) as unknown as Task[];
   }
@@ -95,16 +111,26 @@ export class TaskStore {
 
   update(id: number, patch: UpdatePatch): Task {
     const current = this.#require(id);
+    if (typeof patch.parentId === 'number') {
+      const parent = this.#validParent(patch.parentId, current);
+      if (parent.project !== current.project)
+        throw new InvalidParentError(`task ${id} is in project "${current.project}", parent ${parent.id} in "${parent.project}"`);
+    }
     this.#db
-      .prepare('UPDATE tasks SET title = ?, description = ?, due = ?, updated_at = ? WHERE id = ?')
+      .prepare('UPDATE tasks SET title = ?, description = ?, due = ?, parent_id = ?, updated_at = ? WHERE id = ?')
       .run(
         patch.title ?? current.title,
         patch.description ?? current.description,
         patch.due === undefined ? current.due : patch.due,
+        patch.parentId === undefined ? current.parent_id : patch.parentId,
         now(),
         id,
       );
     return this.#require(id);
+  }
+
+  subtasks(id: number): Task[] {
+    return this.#db.prepare('SELECT * FROM tasks WHERE parent_id = ? ORDER BY id ASC').all(id) as unknown as Task[];
   }
 
   setStatus(id: number, status: string): Task {
@@ -114,9 +140,10 @@ export class TaskStore {
     return this.#require(id);
   }
 
-  remove(id: number): void {
-    const result = this.#db.prepare('DELETE FROM tasks WHERE id = ?').run(id);
-    if (result.changes === 0) throw new NotFoundError(id);
+  remove(id: number): number {
+    this.#require(id);
+    const result = this.#db.prepare('DELETE FROM tasks WHERE id = ? OR parent_id = ?').run(id, id);
+    return Number(result.changes);
   }
 
   dataVersion(): number {
@@ -126,6 +153,16 @@ export class TaskStore {
 
   close(): void {
     this.#db.close();
+  }
+
+  #validParent(parentId: number, child?: Task): Task {
+    const parent = this.get(parentId);
+    if (!parent) throw new NotFoundError(parentId);
+    if (parent.parent_id !== null) throw new InvalidParentError(`task ${parentId} is a subtask and cannot have subtasks`);
+    if (child?.id === parentId) throw new InvalidParentError(`task ${parentId} cannot be its own parent`);
+    if (child && this.subtasks(child.id).length > 0)
+      throw new InvalidParentError(`task ${child.id} has subtasks and cannot become a subtask`);
+    return parent;
   }
 
   #require(id: number): Task {

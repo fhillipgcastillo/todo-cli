@@ -21,6 +21,7 @@ test('board action keys', () => {
   assert.equal(keyToAction('board', '7', none), undefined);
   assert.deepEqual(keyToAction('board', '', { return: true }), { type: 'open' });
   assert.deepEqual(keyToAction('board', 'a', none), { type: 'add' });
+  assert.deepEqual(keyToAction('board', 's', none), { type: 'addSubtask' });
   assert.deepEqual(keyToAction('board', 'e', none), { type: 'edit' });
   assert.deepEqual(keyToAction('board', 'd', none), { type: 'editDescription' });
   assert.deepEqual(keyToAction('board', 'x', none), { type: 'delete' });
@@ -38,6 +39,7 @@ test('detail keys', () => {
   assert.deepEqual(keyToAction('detail', '3', none), { type: 'jump', column: 2 });
   assert.deepEqual(keyToAction('detail', 'x', none), { type: 'delete' });
   assert.equal(keyToAction('detail', 'a', none), undefined);
+  assert.equal(keyToAction('detail', 's', none), undefined);
   assert.equal(keyToAction('detail', 'h', none), undefined);
   assert.equal(keyToAction('detail', '', { return: true }), undefined);
 });

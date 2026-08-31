@@ -66,6 +66,40 @@ test('show, update, set_status, delete round-trip', async () => {
   assert.equal(store.get(t.id), undefined);
 });
 
+test('add_task with parent_id creates a subtask in the parent project', async () => {
+  const parent = store.add({ project: 'default-proj', title: 'parent' });
+  const r = await client.callTool({ name: 'add_task', arguments: { title: 'sub', parent_id: parent.id, project: 'ignored' } });
+  const task = text(r) as { parent_id: number; project: string };
+  assert.equal(task.parent_id, parent.id);
+  assert.equal(task.project, 'default-proj');
+});
+
+test('add_task under a subtask returns the refusal as a tool error', async () => {
+  const parent = store.add({ project: 'default-proj', title: 'parent' });
+  const sub = store.add({ project: 'default-proj', title: 'sub', parentId: parent.id });
+  const r = await client.callTool({ name: 'add_task', arguments: { title: 'deep', parent_id: sub.id } });
+  assert.equal(r.isError, true);
+  assert.match((r.content as { text: string }[])[0]!.text, /is a subtask and cannot have subtasks/);
+});
+
+test('show_task includes the subtasks summary', async () => {
+  const parent = store.add({ project: 'default-proj', title: 'parent' });
+  const sub = store.add({ project: 'default-proj', title: 'sub', parentId: parent.id });
+  store.setStatus(sub.id, 'done');
+  const shown = text(await client.callTool({ name: 'show_task', arguments: { id: parent.id } })) as { subtasks: unknown[] };
+  assert.deepEqual(shown.subtasks, [{ id: sub.id, title: 'sub', status: 'done' }]);
+});
+
+test('update_task with parent_id null detaches; list_tasks filters by parent_id', async () => {
+  const parent = store.add({ project: 'default-proj', title: 'parent' });
+  const sub = store.add({ project: 'default-proj', title: 'sub', parentId: parent.id });
+  store.add({ project: 'default-proj', title: 'other' });
+  const listed = text(await client.callTool({ name: 'list_tasks', arguments: { parent_id: parent.id } })) as { id: number }[];
+  assert.deepEqual(listed.map((t) => t.id), [sub.id]);
+  const detached = text(await client.callTool({ name: 'update_task', arguments: { id: sub.id, parent_id: null } })) as { parent_id: number | null };
+  assert.equal(detached.parent_id, null);
+});
+
 test('errors are returned as isError with the message', async () => {
   const r = await client.callTool({ name: 'show_task', arguments: { id: 999 } });
   assert.equal(r.isError, true);
