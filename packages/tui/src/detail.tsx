@@ -12,9 +12,12 @@ export interface DetailProps {
   height: number;
   live: boolean;
   message: string | null;
+  showHelp: boolean;
 }
 
-export function Detail({ task, parent, subtasks, scroll, height, live, message }: DetailProps) {
+const HELP = '↑/↓ j/k scroll  [ ] move  1-6 jump  e edit  d description  x delete  r reload  esc back  q quit';
+
+export function Detail({ task, parent, subtasks, scroll, height, live, message, showHelp }: DetailProps) {
   const lines = task.description.split('\n');
   const visible = lines.slice(scroll, scroll + height);
   return (
@@ -39,6 +42,7 @@ export function Detail({ task, parent, subtasks, scroll, height, live, message }
       <Text> </Text>
       {visible.map((line, i) => <Text key={scroll + i}>{line || ' '}</Text>)}
       {lines.length > height ? <Text dimColor>({scroll + visible.length}/{lines.length} lines, ↑/↓ scroll)</Text> : null}
+      {showHelp ? <Text dimColor>{HELP}</Text> : null}
       {message ? <Text color="yellow">{message}</Text> : null}
     </Box>
   );

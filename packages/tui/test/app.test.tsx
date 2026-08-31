@@ -460,14 +460,46 @@ test('a failing $EDITOR leaves the description untouched and reports it', async 
   });
 });
 
-test('? toggles help', async () => {
+test('long columns scroll with the selection and show overflow counts', async () => {
+  for (let i = 0; i < 20; i++) store.add({ project: 'p', title: `t${i + 1}` });
   const r = mount();
   await tick();
-  r.stdin.write('?');
+  assert.match(r.lastFrame()!, /↓ 4 more/);
+  assert.doesNotMatch(r.lastFrame()!, /#20/);
+  for (let i = 0; i < 19; i++) {
+    r.stdin.write('j');
+    await tick(20);
+  }
+  await tick();
+  assert.match(r.lastFrame()!, />#20 t20/);
+  assert.match(r.lastFrame()!, /↑ 4 more/);
+  assert.doesNotMatch(r.lastFrame()!, /↓ \d+ more/);
+  r.unmount();
+});
+
+test('board help is visible by default and ? toggles it', async () => {
+  const r = mount();
   await tick();
   assert.match(r.lastFrame()!, /\[ \] move/);
   r.stdin.write('?');
   await tick();
   assert.doesNotMatch(r.lastFrame()!, /\[ \] move/);
+  r.stdin.write('?');
+  await tick();
+  assert.match(r.lastFrame()!, /\[ \] move/);
+  r.unmount();
+});
+
+test('detail shows its key help by default and ? toggles it', async () => {
+  store.add({ project: 'p', title: 'detailed' });
+  const r = mount();
+  await tick();
+  r.stdin.write('\r');
+  await tick();
+  assert.match(r.lastFrame()!, /e edit {2}d description/);
+  assert.match(r.lastFrame()!, /esc back/);
+  r.stdin.write('?');
+  await tick();
+  assert.doesNotMatch(r.lastFrame()!, /e edit/);
   r.unmount();
 });

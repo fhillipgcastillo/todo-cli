@@ -59,6 +59,43 @@ export function moveSelection(
   return tasks[row]!.id;
 }
 
+export interface ColumnView {
+  tasks: Task[];
+  /** Cards hidden above the window */
+  above: number;
+  /** Cards hidden below the window */
+  below: number;
+}
+
+export function viewColumn(
+  tasks: Task[],
+  selectedId: number | null,
+  lines: number,
+  lineCount: (task: Task) => number,
+): ColumnView {
+  const heights = tasks.map(lineCount);
+  const total = heights.reduce((sum, h) => sum + h, 0);
+  if (total <= lines) return { tasks, above: 0, below: 0 };
+  const budget = Math.max(2, lines - 2);
+  const endFrom = (start: number): number => {
+    let used = 0;
+    let end = start;
+    while (end < tasks.length && used + heights[end]! <= budget) {
+      used += heights[end]!;
+      end++;
+    }
+    return Math.max(end, start + 1);
+  };
+  const selected = Math.max(0, tasks.findIndex((t) => t.id === selectedId));
+  let start = 0;
+  let end = endFrom(start);
+  while (selected >= end) {
+    start++;
+    end = endFrom(start);
+  }
+  return { tasks: tasks.slice(start, end), above: start, below: tasks.length - end };
+}
+
 export function truncate(text: string, width: number): string {
   if (text.length <= width) return text.padEnd(width);
   return text.slice(0, Math.max(0, width - 1)) + '…';

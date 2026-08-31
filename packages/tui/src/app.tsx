@@ -27,7 +27,7 @@ export function App({ store, project, all, intervalMs }: AppProps) {
   const [mode, setMode] = useState<Mode>('board');
   const [message, setMessage] = useState<string | null>(null);
   const [live, setLive] = useState(true);
-  const [showHelp, setShowHelp] = useState(false);
+  const [showHelp, setShowHelp] = useState(true);
   const [scroll, setScroll] = useState(0);
   const [size, setSize] = useState({ columns: stdout.columns ?? 80, rows: stdout.rows ?? 24 });
   const [formTarget, setFormTarget] = useState<FormTarget | null>(null);
@@ -241,6 +241,7 @@ export function App({ store, project, all, intervalMs }: AppProps) {
         height={height}
         live={live}
         message={message}
+        showHelp={showHelp}
       />
     );
   }
@@ -253,6 +254,7 @@ export function App({ store, project, all, intervalMs }: AppProps) {
       live={live}
       message={message}
       width={size.columns}
+      height={size.rows}
       showHelp={showHelp}
     />
   );
