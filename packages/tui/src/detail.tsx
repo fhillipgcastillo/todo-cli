@@ -1,5 +1,6 @@
 import { Box, Text } from 'ink';
 import type { Task } from '@todo/core';
+import { ACCENTS } from './theme.ts';
 
 export interface DetailProps {
   task: Task;
@@ -22,28 +23,38 @@ export function Detail({ task, parent, subtasks, scroll, height, live, message, 
   const visible = lines.slice(scroll, scroll + height);
   return (
     <Box flexDirection="column">
-      <Box justifyContent="space-between">
-        <Text bold>#{task.id} {task.title}</Text>
-        <Text>{live ? '● live' : '○ paused'}  esc back</Text>
-      </Box>
-      <Text>project: {task.project}</Text>
-      <Text>status:  {task.status}</Text>
-      {parent ? <Text>parent:  #{parent.id} {parent.title}</Text> : null}
-      <Text>due:     {task.due ?? '-'}</Text>
-      <Text>created: {task.created_at}</Text>
-      <Text>updated: {task.updated_at}</Text>
-      {subtasks.length > 0 ? (
-        <Box flexDirection="column">
-          <Text> </Text>
-          <Text bold>subtasks ({subtasks.filter((s) => s.status === 'done').length}/{subtasks.length}):</Text>
-          {subtasks.map((s) => <Text key={s.id}>  [{s.status}] #{s.id} {s.title}</Text>)}
+      <Box flexDirection="column" borderStyle="round" borderColor={ACCENTS[task.status]} paddingX={1}>
+        <Box justifyContent="space-between">
+          <Text bold>#{task.id} {task.title}</Text>
+          <Text>
+            {live ? <Text color="green">● live</Text> : <Text dimColor>○ paused</Text>}
+            <Text dimColor>  esc back</Text>
+          </Text>
         </Box>
-      ) : null}
-      <Text> </Text>
-      {visible.map((line, i) => <Text key={scroll + i}>{line || ' '}</Text>)}
-      {lines.length > height ? <Text dimColor>({scroll + visible.length}/{lines.length} lines, ↑/↓ scroll)</Text> : null}
-      {showHelp ? <Text dimColor>{HELP}</Text> : null}
-      {message ? <Text color="yellow">{message}</Text> : null}
+        <Text><Text dimColor>project: </Text>{task.project}</Text>
+        <Text><Text dimColor>status:  </Text><Text color={ACCENTS[task.status]}>{task.status}</Text></Text>
+        {parent ? <Text><Text dimColor>parent:  </Text>#{parent.id} {parent.title}</Text> : null}
+        <Text><Text dimColor>due:     </Text>{task.due ?? '-'}</Text>
+        <Text><Text dimColor>created: </Text>{task.created_at}</Text>
+        <Text><Text dimColor>updated: </Text>{task.updated_at}</Text>
+        {subtasks.length > 0 ? (
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold>── subtasks ({subtasks.filter((s) => s.status === 'done').length}/{subtasks.length}) ──</Text>
+            {subtasks.map((s) => (
+              <Text key={s.id}>  [<Text color={ACCENTS[s.status]}>{s.status}</Text>] #{s.id} {s.title}</Text>
+            ))}
+          </Box>
+        ) : null}
+        {task.description !== '' ? (
+          <Box flexDirection="column" marginTop={1}>
+            <Text bold>── description ──</Text>
+            {visible.map((line, i) => <Text key={scroll + i}>{line || ' '}</Text>)}
+            {lines.length > height ? <Text dimColor>({scroll + visible.length}/{lines.length} lines, ↑/↓ scroll)</Text> : null}
+          </Box>
+        ) : null}
+      </Box>
+      {showHelp ? <Box paddingX={1}><Text dimColor>{HELP}</Text></Box> : null}
+      {message ? <Box paddingX={1}><Text inverse color="yellow"> {message} </Text></Box> : null}
     </Box>
   );
 }

@@ -54,24 +54,27 @@ export function Form({ heading, initial, onSubmit, onCancel, onEditDescription, 
     onSubmit(values);
   };
 
+  const marker = (name: Field) => (field === name ? <Text color="cyan">❯ </Text> : <Text>  </Text>);
   return (
     <Box flexDirection="column">
-      <Text bold>{heading}</Text>
-      <Box>
-        <Text>{field === 'title' ? '> ' : '  '}title: </Text>
-        <TextInput value={title} onChange={setTitle} onSubmit={submit} focus={field === 'title'} />
+      <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} alignSelf="flex-start">
+        <Text bold color="cyan">{heading}</Text>
+        <Box>
+          <Text>{marker('title')}title: </Text>
+          <TextInput value={title} onChange={setTitle} onSubmit={submit} focus={field === 'title'} />
+        </Box>
+        <Box>
+          <Text>{marker('due')}due:   </Text>
+          <TextInput value={due} onChange={setDue} onSubmit={submit} focus={field === 'due'} placeholder="YYYY-MM-DD" />
+        </Box>
+        <Box>
+          <Text>{marker('description')}description: {summary(description)}</Text>
+          {field === 'description' ? <Text dimColor>  (enter opens $EDITOR)</Text> : null}
+        </Box>
       </Box>
-      <Box>
-        <Text>{field === 'due' ? '> ' : '  '}due:   </Text>
-        <TextInput value={due} onChange={setDue} onSubmit={submit} focus={field === 'due'} placeholder="YYYY-MM-DD" />
-      </Box>
-      <Box>
-        <Text>{field === 'description' ? '> ' : '  '}description: {summary(description)}</Text>
-        {field === 'description' ? <Text dimColor>  (enter opens $EDITOR)</Text> : null}
-      </Box>
-      <Text dimColor>tab switch field · enter save / on description open $EDITOR · esc cancel</Text>
-      {error ? <Text color="red">{error}</Text> : null}
-      {message ? <Text color="yellow">{message}</Text> : null}
+      <Box paddingX={1}><Text dimColor>tab switch field · enter save / on description open $EDITOR · esc cancel</Text></Box>
+      {error ? <Box paddingX={1}><Text inverse color="red"> {error} </Text></Box> : null}
+      {message ? <Box paddingX={1}><Text inverse color="yellow"> {message} </Text></Box> : null}
     </Box>
   );
 }

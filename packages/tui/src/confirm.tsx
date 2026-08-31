@@ -1,4 +1,4 @@
-import { Text, useInput } from 'ink';
+import { Box, Text, useInput } from 'ink';
 
 export interface ConfirmProps {
   question: string;
@@ -11,5 +11,9 @@ export function Confirm({ question, onYes, onNo }: ConfirmProps) {
     if (input === 'y' || input === 'Y') onYes();
     else if (input === 'n' || input === 'N' || key.escape) onNo();
   });
-  return <Text color="red">{question}</Text>;
+  return (
+    <Box borderStyle="round" borderColor="red" paddingX={1} alignSelf="flex-start">
+      <Text color="red">{question}</Text>
+    </Box>
+  );
 }
