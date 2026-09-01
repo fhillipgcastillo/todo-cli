@@ -168,8 +168,8 @@ inside its own directory:
 
 (`pnpm link --global` was removed in pnpm 11; `pnpm add -g .` replaces it.)
 
-If a global command looks stale after `pnpm build`, re-run the matching
-`pnpm add -g .` to refresh it.
+This symlinks the clone (`@todo/core -> <REPO>/packages/core`), so a later
+`pnpm build` is picked up immediately — you never need to re-run `pnpm add -g`.
 
 `todo-tui` opens the live board for the current repo; `todo-tui --all` for
 every project. Keys: `?` inside the board.
