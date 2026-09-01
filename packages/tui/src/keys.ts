@@ -1,4 +1,4 @@
-export type Mode = 'board' | 'detail' | 'form' | 'confirm';
+export type Mode = 'board' | 'detail' | 'form' | 'confirm' | 'picker';
 
 export type Action =
   | { type: 'column'; delta: -1 | 1 }
@@ -12,6 +12,7 @@ export type Action =
   | { type: 'edit' }
   | { type: 'editDescription' }
   | { type: 'delete' }
+  | { type: 'pickProject' }
   | { type: 'reload' }
   | { type: 'help' }
   | { type: 'quit' };
@@ -50,6 +51,7 @@ function boardAction(input: string, key: KeyInfo): Action | undefined {
   if (key.return) return { type: 'open' };
   if (input === 'a') return { type: 'add' };
   if (input === 's') return { type: 'addSubtask' };
+  if (input === 'p') return { type: 'pickProject' };
   return sharedAction(input, key);
 }
 

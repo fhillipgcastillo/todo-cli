@@ -16,7 +16,7 @@ export interface BoardProps {
   showHelp: boolean;
 }
 
-const HELP = '←/→ h/l column  ↑/↓ j/k row  [ ] move  1-6 jump  enter open  a add  s subtask  e edit  d description  x delete  r reload  q quit';
+const HELP = '←/→ h/l column  ↑/↓ j/k row  [ ] move  1-6 jump  enter open  a add  s subtask  e edit  d description  x delete  p project  r reload  q quit';
 
 function columnTitle(status: string, count: number, width: number): string {
   const full = `${status} (${count})`;

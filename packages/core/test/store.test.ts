@@ -47,6 +47,17 @@ test('list filters by project, status, all', () => {
   assert.equal(store.list().length, 2);
 });
 
+test('projects returns distinct names sorted', () => {
+  store.add({ project: 'beta', title: '1' });
+  store.add({ project: 'alpha', title: '2' });
+  store.add({ project: 'beta', title: '3' });
+  assert.deepEqual(store.projects(), ['alpha', 'beta']);
+});
+
+test('projects is empty on a fresh store', () => {
+  assert.deepEqual(store.projects(), []);
+});
+
 test('list orders by id ascending', () => {
   store.add({ project: 'a', title: 'one' });
   store.add({ project: 'a', title: 'two' });

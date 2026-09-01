@@ -105,6 +105,11 @@ export class TaskStore {
     return this.#db.prepare(`SELECT * FROM tasks ${clause} ORDER BY id ASC`).all(...params) as unknown as Task[];
   }
 
+  projects(): string[] {
+    const rows = this.#db.prepare('SELECT DISTINCT project FROM tasks ORDER BY project ASC').all() as unknown as { project: string }[];
+    return rows.map((r) => r.project);
+  }
+
   get(id: number): Task | undefined {
     return this.#db.prepare('SELECT * FROM tasks WHERE id = ?').get(id) as unknown as Task | undefined;
   }

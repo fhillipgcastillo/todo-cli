@@ -546,3 +546,65 @@ test('detail shows its key help by default and ? toggles it', async () => {
   assert.doesNotMatch(r.lastFrame()!, /e edit/);
   r.unmount();
 });
+
+test('p opens the picker; selecting a project narrows the board and a adds to it', async () => {
+  store.add({ project: 'p', title: 'mine' });
+  store.add({ project: 'other', title: 'elsewhere' });
+  const r = mount(true);
+  await tick();
+  assert.match(r.lastFrame()!, /p project/);
+  r.stdin.write('p');
+  await tick();
+  assert.match(r.lastFrame()!, /switch project/);
+  assert.match(r.lastFrame()!, /❯ all projects/);
+  r.stdin.write('j');
+  await tick();
+  r.stdin.write('\r');
+  await tick();
+  await resize(r, 130);
+  assert.match(r.lastFrame()!, /project: other/);
+  assert.match(r.lastFrame()!, /elsewhere/);
+  assert.doesNotMatch(r.lastFrame()!, /mine/);
+  r.stdin.write('a');
+  await tick();
+  assert.match(r.lastFrame()!, /add task · project: other/);
+  r.unmount();
+});
+
+test('selecting all projects widens the board; a adds to the launch project', async () => {
+  store.add({ project: 'p', title: 'mine' });
+  store.add({ project: 'other', title: 'elsewhere' });
+  const r = mount();
+  await tick();
+  r.stdin.write('p');
+  await tick();
+  assert.match(r.lastFrame()!, /❯ p\b/);
+  r.stdin.write('k');
+  await tick();
+  r.stdin.write('k');
+  await tick();
+  r.stdin.write('\r');
+  await tick();
+  await resize(r, 130);
+  assert.match(r.lastFrame()!, /all projects/);
+  assert.match(r.lastFrame()!, /\[other\]/);
+  r.stdin.write('a');
+  await tick();
+  assert.match(r.lastFrame()!, /add task · project: p/);
+  r.unmount();
+});
+
+test('esc closes the picker without changing the scope', async () => {
+  store.add({ project: 'other', title: 'elsewhere' });
+  const r = mount();
+  await tick();
+  r.stdin.write('p');
+  await tick();
+  assert.match(r.lastFrame()!, /switch project/);
+  r.stdin.write(ESC);
+  await tick();
+  assert.doesNotMatch(r.lastFrame()!, /switch project/);
+  assert.match(r.lastFrame()!, /project: p/);
+  assert.doesNotMatch(r.lastFrame()!, /elsewhere/);
+  r.unmount();
+});

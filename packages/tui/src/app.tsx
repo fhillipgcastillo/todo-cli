@@ -7,6 +7,7 @@ import { Board } from './board.tsx';
 import { Detail } from './detail.tsx';
 import { Form, type FormValues } from './form.tsx';
 import { Confirm } from './confirm.tsx';
+import { Picker } from './picker.tsx';
 
 export interface AppProps {
   store: TaskStore;
@@ -17,8 +18,10 @@ export interface AppProps {
 
 type FormTarget = { kind: 'new' } | { kind: 'subtask'; parent: Task } | { kind: 'edit'; task: Task };
 
-export function App({ store, project, all, intervalMs }: AppProps) {
+export function App({ store, project: initialProject, all: initialAll, intervalMs }: AppProps) {
   const { exit } = useApp();
+  const [project, setProject] = useState(initialProject);
+  const [all, setAll] = useState(initialAll);
   const { stdout } = useStdout();
   const { setRawMode, isRawModeSupported } = useStdin();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -150,6 +153,9 @@ export function App({ store, project, all, intervalMs }: AppProps) {
       case 'delete':
         withTask((task) => { setDeleteTarget(task); setReturnMode(mode); setMode('confirm'); });
         return;
+      case 'pickProject':
+        setMode('picker');
+        return;
       case 'reload':
         reload();
         return;
@@ -208,8 +214,24 @@ export function App({ store, project, all, intervalMs }: AppProps) {
     setMode(returnMode);
   };
 
+  const pickProject = (picked: string | null) => {
+    setAll(picked === null);
+    setProject(picked ?? initialProject);
+    setMode('board');
+  };
+
   const height = Math.max(3, size.rows - 13);
   const task = selectedTask();
+  if (mode === 'picker') {
+    return (
+      <Picker
+        projects={store.projects()}
+        current={all ? null : project}
+        onSelect={pickProject}
+        onCancel={() => setMode('board')}
+      />
+    );
+  }
   if (mode === 'confirm' && deleteTarget) {
     const subCount = tasks.filter((t) => t.parent_id === deleteTarget.id).length;
     const suffix = subCount > 0 ? ` and ${subCount} subtasks` : '';

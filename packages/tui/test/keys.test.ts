@@ -25,6 +25,7 @@ test('board action keys', () => {
   assert.deepEqual(keyToAction('board', 'e', none), { type: 'edit' });
   assert.deepEqual(keyToAction('board', 'd', none), { type: 'editDescription' });
   assert.deepEqual(keyToAction('board', 'x', none), { type: 'delete' });
+  assert.deepEqual(keyToAction('board', 'p', none), { type: 'pickProject' });
   assert.deepEqual(keyToAction('board', 'r', none), { type: 'reload' });
   assert.deepEqual(keyToAction('board', '?', none), { type: 'help' });
   assert.deepEqual(keyToAction('board', 'q', none), { type: 'quit' });
@@ -39,12 +40,14 @@ test('detail keys', () => {
   assert.deepEqual(keyToAction('detail', '3', none), { type: 'jump', column: 2 });
   assert.deepEqual(keyToAction('detail', 'x', none), { type: 'delete' });
   assert.equal(keyToAction('detail', 'a', none), undefined);
+  assert.equal(keyToAction('detail', 'p', none), undefined);
   assert.equal(keyToAction('detail', 's', none), undefined);
   assert.equal(keyToAction('detail', 'h', none), undefined);
   assert.equal(keyToAction('detail', '', { return: true }), undefined);
 });
 
-test('form and confirm are not mapped', () => {
+test('form, confirm and picker are not mapped', () => {
   assert.equal(keyToAction('form', 'q', none), undefined);
   assert.equal(keyToAction('confirm', 'q', none), undefined);
+  assert.equal(keyToAction('picker', 'q', none), undefined);
 });
