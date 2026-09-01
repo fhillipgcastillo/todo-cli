@@ -148,9 +148,28 @@ clone — no publish step. `<REPO>` below is the absolute path of the clone.
 
 ### 2. `todo` and `todo-tui` commands on your PATH (optional, for manual use)
 
-    npm link ./packages/core ./packages/tui
+Install globally with **pnpm**, not npm. This repo is a pnpm workspace
+(symlinked `node_modules`, `workspace:*` deps), which npm's installer cannot
+model — `npm link` aborts with `TypeError: Cannot read properties of null
+(reading 'package')`.
+
+First time only, give pnpm a global bin directory and add it to your PATH:
+
+    pnpm setup
+
+Open a **new** terminal so the PATH change applies — `pnpm bin -g` should print
+a directory rather than an error — then register each package's bins from
+inside its own directory:
+
+    cd packages/core && pnpm add -g . && cd ../..   # todo
+    cd packages/tui  && pnpm add -g . && cd ../..   # todo-tui
     todo --version        # 0.1.0
     todo-tui --version    # 0.1.0
+
+(`pnpm link --global` was removed in pnpm 11; `pnpm add -g .` replaces it.)
+
+If a global command looks stale after `pnpm build`, re-run the matching
+`pnpm add -g .` to refresh it.
 
 `todo-tui` opens the live board for the current repo; `todo-tui --all` for
 every project. Keys: `?` inside the board.
@@ -180,7 +199,7 @@ first). `/mcp` shows the `todo` server as connected.
 
     claude mcp remove --scope user todo
     rm ~/.claude/skills/todo
-    npm unlink -g @todo/core
+    pnpm remove -g @todo/core @todo/tui
 
 ### After pulling changes
 
